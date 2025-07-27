@@ -1,24 +1,49 @@
-import { Course } from "@/lib/firebase";
+import { Course, Lesson, Quiz, Assignment, QuizQuestion } from "@/lib/firebase";
 
-export interface CourseData extends Course {
-  modules?: {
-    id: string;
-    title: string;
-    description: string;
-    lessons: string[]; // lesson IDs
-    duration: number;
-  }[];
-  certificate?: {
-    available: boolean;
-    requirements: string[];
-    template: string;
-  };
-  resources?: {
-    type: 'pdf' | 'link' | 'video' | 'tool';
-    title: string;
-    url: string;
-    description: string;
-  }[];
+export interface CourseModule {
+  id: string;
+  title: string;
+  description: string;
+  lessons: string[]; // lesson IDs
+  duration: number;
+}
+
+export interface CourseCertificate {
+  available: boolean;
+  requirements: string[];
+  template: string;
+}
+
+export interface CourseResource {
+  type: 'pdf' | 'link' | 'video' | 'tool';
+  title: string;
+  url: string;
+  description: string;
+}
+
+export interface CourseData {
+  id: string;
+  title: string;
+  description: string;
+  instructor: string;
+  instructorName: string;
+  thumbnailUrl?: string;
+  category: string;
+  level: 'beginner' | 'intermediate' | 'advanced';
+  duration: number;
+  lessons: Lesson[];
+  requirements: string[];
+  objectives: string[];
+  tags: string[];
+  rating: number;
+  enrolledCount: number;
+  price: number;
+  isPro: boolean;
+  createdAt: string;
+  updatedAt: string;
+  modules?: CourseModule[];
+  certificate?: CourseCertificate;
+  resources?: CourseResource[];
 }
 
 export const courseDatabase: CourseData[] = [
@@ -63,8 +88,8 @@ export const courseDatabase: CourseData[] = [
         id: "module2", 
         title: "Ohmsches Gesetz und Grundschaltungen",
         description: "Das wichtigste Gesetz der Elektrotechnik",
-        lessons: ["lesson4", "lesson5", "lesson6"],
-        duration: 150
+        lessons: ["lesson4", "lesson5", "lesson6", "lesson7"],
+        duration: 180
       }
     ],
     certificate: {
@@ -170,6 +195,18 @@ export const courseDatabase: CourseData[] = [
       },
       {
         id: "lesson5",
+        title: "Interaktive Schaltungssimulation - Reihenschaltung",
+        description: "Experimentieren Sie mit einer 3D-Reihenschaltung",
+        type: "simulation",
+        content: {
+          textContent: "# 3D-Schaltungssimulation: Reihenschaltung\n\nIn dieser interaktiven Simulation können Sie:\n\n• Eine dreidimensionale Reihenschaltung erkunden\n• Komponentenwerte in Echtzeit ändern\n• Stromfluss und Spannungsverteilung beobachten\n• Das Ohm'sche Gesetz praktisch anwenden\n\n**Aufgaben:**\n1. Starten Sie die Simulation\n2. Ändern Sie den Widerstandswert und beobachten Sie die Auswirkungen\n3. Berechnen Sie den Gesamtstrom der Schaltung\n4. Prüfen Sie Ihre Berechnungen mit der Simulation"
+        },
+        duration: 30,
+        isCompleted: false,
+        order: 5
+      },
+      {
+        id: "lesson6",
         title: "Sicherheit in der Elektrotechnik",
         description: "VDE-Bestimmungen und Sicherheitsregeln",
         type: "video",
@@ -179,7 +216,7 @@ export const courseDatabase: CourseData[] = [
         },
         duration: 90,
         isCompleted: false,
-        order: 5
+        order: 6
       }
     ]
   },
@@ -225,6 +262,18 @@ export const courseDatabase: CourseData[] = [
         duration: 40,
         isCompleted: false,
         order: 1
+      },
+      {
+        id: "sps_lesson2",
+        title: "3D-Simulation: Parallelschaltung verstehen",
+        description: "Interaktive Parallelschaltung mit mehreren Zweigen",
+        type: "simulation",
+        content: {
+          textContent: "# 3D-Simulation: Parallelschaltung\n\nIn dieser erweiterten Simulation lernen Sie:\n\n• Wie sich Ströme in Parallelschaltungen verhalten\n• Warum die Spannung in allen Zweigen gleich ist\n• Berechnung von Teilströmen\n• Gesamtwiderstand von Parallelschaltungen\n\n**Interaktive Aufgaben:**\n1. Beobachten Sie den unterschiedlichen Stromfluss in den Zweigen\n2. Ändern Sie Widerstandswerte und sehen Sie die Auswirkungen\n3. Berechnen Sie den Gesamtstrom\n4. Verstehen Sie das Verhalten bei Ausfall eines Zweiges\n\n**Formel für Parallelwiderstand:**\n1/R_gesamt = 1/R1 + 1/R2 + 1/R3 + ..."
+        },
+        duration: 35,
+        isCompleted: false,
+        order: 2
       }
     ]
   },

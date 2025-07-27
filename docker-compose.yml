@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  meisterwerk-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      # Mount nginx config for development changes
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service with hot reload
+  meisterwerk-dev:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    command: >
+      sh -c "
+        if [ -f bun.lockb ]; then
+          npm install -g bun && bun install && bun run dev --host 0.0.0.0
+        else
+          npm install && npm run dev -- --host 0.0.0.0
+        fi
+      "
+    environment:
+      - NODE_ENV=development
+    profiles:
+      - dev
+
+volumes:
+  node_modules:
