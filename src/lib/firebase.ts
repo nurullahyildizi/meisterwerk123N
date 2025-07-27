@@ -17,7 +17,6 @@ import {
   collection,
   getDocs,
   addDoc,
-  serverTimestamp,
   query,
   orderBy,
   limit,
@@ -26,12 +25,19 @@ import {
   arrayUnion,
   arrayRemove,
   increment,
-  Timestamp
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
-// Firebase configuration
-
+// KORREKTUR: Firebase-Konfiguration wird sicher aus Umgebungsvariablen geladen.
+// Stellen Sie sicher, dass Ihre .env.local-Datei diese Variablen enthält (z.B. VITE_FIREBASE_API_KEY="...")
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -41,7 +47,10 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// Enhanced User interface
+// ========================================================================
+// INTERFACE DEFINITIONS
+// ========================================================================
+
 export interface User {
   id: string;
   name: string;
@@ -71,7 +80,6 @@ export interface User {
   };
 }
 
-// Social Post interface
 export interface SocialPost {
   id: string;
   authorId: string;
@@ -81,7 +89,7 @@ export interface SocialPost {
   images?: string[];
   type: 'text' | 'achievement' | 'course_completion' | 'question' | 'tip';
   tags: string[];
-  likes: string[]; // Array of user IDs who liked
+  likes: string[];
   comments: PostComment[];
   shares: number;
   createdAt: string;
@@ -90,7 +98,6 @@ export interface SocialPost {
   pinned?: boolean;
 }
 
-// Comment interface
 export interface PostComment {
   id: string;
   authorId: string;
@@ -103,7 +110,6 @@ export interface PostComment {
   updatedAt?: string;
 }
 
-// Comment Reply interface
 export interface CommentReply {
   id: string;
   authorId: string;
@@ -112,10 +118,9 @@ export interface CommentReply {
   content: string;
   likes: string[];
   createdAt: string;
-  replyToId?: string; // If replying to another reply
+  replyToId?: string;
 }
 
-// Message interfaces
 export interface PrivateMessage {
   id: string;
   senderId: string;
@@ -127,10 +132,9 @@ export interface PrivateMessage {
   isRead: boolean;
   createdAt: string;
   editedAt?: string;
-  replyTo?: string; // Message ID this is replying to
+  replyTo?: string;
 }
 
-// Group Chat interfaces
 export interface GroupChat {
   id: string;
   name: string;
@@ -160,11 +164,10 @@ export interface GroupMessage {
   fileName?: string;
   createdAt: string;
   editedAt?: string;
-  reactions: { [emoji: string]: string[] }; // emoji -> array of user IDs
+  reactions: { [emoji: string]: string[] };
   replyTo?: string;
 }
 
-// Learning Room interfaces
 export interface LearningRoom {
   id: string;
   name: string;
@@ -182,7 +185,7 @@ export interface LearningRoom {
     recurring: 'none' | 'daily' | 'weekly' | 'monthly';
   };
   resources: LearningResource[];
-  whiteboardData?: any; // TLDraw data
+  whiteboardData?: any;
   createdAt: string;
   isActive: boolean;
 }
@@ -207,13 +210,12 @@ export interface Poll {
   id: string;
   question: string;
   options: string[];
-  votes: { [option: string]: string[] }; // option -> user IDs
+  votes: { [option: string]: string[] };
   createdBy: string;
   createdAt: string;
   endsAt?: string;
 }
 
-// Course and Learning interfaces
 export interface Course {
   id: string;
   title: string;
@@ -223,7 +225,7 @@ export interface Course {
   thumbnailUrl?: string;
   category: string;
   level: 'beginner' | 'intermediate' | 'advanced';
-  duration: number; // in minutes
+  duration: number;
   lessons: Lesson[];
   requirements: string[];
   objectives: string[];
@@ -259,7 +261,7 @@ export interface Quiz {
   id: string;
   title: string;
   questions: QuizQuestion[];
-  timeLimit?: number; // in minutes
+  timeLimit?: number;
   passingScore: number;
   maxAttempts: number;
 }
@@ -290,7 +292,6 @@ export interface AssignmentRubric {
   levels: { name: string; description: string; points: number }[];
 }
 
-// Learning Resource interfaces
 export interface LearningResource {
   id: string;
   title: string;
@@ -302,7 +303,6 @@ export interface LearningResource {
   uploadedAt: string;
 }
 
-// Notification interface
 export interface UserNotification {
   id: string;
   type: 'friend_request' | 'message' | 'course_update' | 'achievement' | 'reminder' | 'system';
@@ -310,11 +310,10 @@ export interface UserNotification {
   content: string;
   isRead: boolean;
   actionUrl?: string;
-  relatedId?: string; // ID of related object (friend request, message, etc.)
+  relatedId?: string;
   createdAt: string;
 }
 
-// Achievement interface
 export interface Achievement {
   id: string;
   name: string;
@@ -333,14 +332,13 @@ export interface Achievement {
   rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 }
 
-// Progress Tracking interfaces
 export interface CourseProgress {
   courseId: string;
   enrolledAt: string;
   completedLessons: string[];
   currentLesson: number;
-  progress: number; // percentage
-  totalTimeSpent: number; // in minutes
+  progress: number;
+  totalTimeSpent: number;
   lastAccessedAt: string;
   quizScores: { [lessonId: string]: number };
   certificateEarned?: boolean;
@@ -351,13 +349,13 @@ export interface LearningStreak {
   currentStreak: number;
   longestStreak: number;
   lastActivityDate: string;
-  weeklyGoal: number; // minutes
-  weeklyProgress: number; // minutes
+  weeklyGoal: number;
+  weeklyProgress: number;
 }
 
 export interface UserStats {
   totalCoursesCompleted: number;
-  totalTimeSpent: number; // in minutes
+  totalTimeSpent: number;
   totalXpEarned: number;
   totalTokensEarned: number;
   averageQuizScore: number;
@@ -382,10 +380,9 @@ export interface Leaderboard {
   score: number;
   rank: number;
   type: 'xp' | 'courses' | 'streak' | 'monthly';
-  period: string; // 'all-time', '2024-01', etc.
+  period: string;
 }
 
-// Event interface
 export interface LearningEvent {
   id: string;
   title: string;
@@ -393,7 +390,7 @@ export interface LearningEvent {
   type: 'workshop' | 'webinar' | 'study_group' | 'competition' | 'networking';
   startDate: string;
   endDate: string;
-  location?: string; // "online" or physical address
+  location?: string;
   maxParticipants?: number;
   participants: string[];
   instructors: string[];
@@ -405,17 +402,19 @@ export interface LearningEvent {
   createdAt: string;
 }
 
-// Authentication functions
+
+// ========================================================================
+// FIREBASE FUNCTIONS
+// ========================================================================
+
+// --- Authentication Functions ---
 export const loginWithEmailAndPassword = async (email: string, password: string) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
-    
-    // Get user data from Firestore
     const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
     if (userDoc.exists()) {
-      const userData = userDoc.data() as User;
-      return { success: true, user: userData };
+      return { success: true, user: userDoc.data() as User };
     } else {
       throw new Error('Benutzerdaten nicht gefunden');
     }
@@ -423,9 +422,7 @@ export const loginWithEmailAndPassword = async (email: string, password: string)
     console.error('Login error:', error);
     return { 
       success: false, 
-      error: error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' 
-        ? 'E-Mail oder Passwort ungültig' 
-        : 'Anmeldung fehlgeschlagen' 
+      error: 'E-Mail oder Passwort ungültig'
     };
   }
 };
@@ -434,8 +431,6 @@ export const registerWithEmailAndPassword = async (name: string, email: string, 
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
-    
-    // Create user document in Firestore
     const newUser: User = {
       id: firebaseUser.uid,
       name,
@@ -462,9 +457,7 @@ export const registerWithEmailAndPassword = async (name: string, email: string, 
         allowFriendRequests: true
       }
     };
-    
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-    
     return { success: true, user: newUser };
   } catch (error: any) {
     console.error('Registration error:', error);
@@ -490,54 +483,52 @@ export const logoutUser = async () => {
 export const getCurrentUser = async (): Promise<User | null> => {
   const firebaseUser = auth.currentUser;
   if (!firebaseUser) return null;
-  
   try {
     const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-    if (userDoc.exists()) {
-      return userDoc.data() as User;
-    }
+    return userDoc.exists() ? userDoc.data() as User : null;
   } catch (error) {
     console.error('Error getting current user:', error);
+    return null;
   }
-  return null;
 };
+
+export const getUserDataById = async (userId: string): Promise<User | null> => {
+    try {
+        const userRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+            return { id: userDoc.id, ...userDoc.data() } as User;
+        }
+        console.warn(`No user found with ID: ${userId}`);
+        return null;
+    } catch (error) {
+        console.error("Error fetching user data by ID:", error);
+        return null;
+    }
+}
 
 export const updateUserData = async (userId: string, updates: Partial<User>): Promise<User> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, updates);
-    
-    const updatedDoc = await getDoc(userRef);
-    if (updatedDoc.exists()) {
-      return updatedDoc.data() as User;
-    }
-    throw new Error('User not found after update');
-  } catch (error) {
-    console.error('Error updating user:', error);
-    throw error;
-  }
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, updates);
+  const updatedDoc = await getDoc(userRef);
+  if (!updatedDoc.exists()) throw new Error('User not found after update');
+  return updatedDoc.data() as User;
 };
 
-// Auth state listener
 export const onAuthStateChange = (callback: (user: FirebaseUser | null) => void) => {
   return onAuthStateChanged(auth, callback);
 };
 
-// SOCIAL FEATURES FUNCTIONS
-
-// Posts functions
+// --- Social Features Functions ---
 export const createPost = async (authorId: string, content: string, type: SocialPost['type'] = 'text', images?: string[], tags: string[] = []): Promise<string> => {
-  try {
     const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
     
-    const postRef = collection(db, 'posts');
-    const newPost: Omit<SocialPost, 'id'> = {
+    const postData: Omit<SocialPost, 'id'> = {
       authorId,
       authorName: user.name,
       authorAvatar: user.avatar,
       content,
-      images,
       type,
       tags,
       likes: [],
@@ -546,200 +537,149 @@ export const createPost = async (authorId: string, content: string, type: Social
       createdAt: new Date().toISOString(),
       visibility: 'public'
     };
-    
-    const docRef = await addDoc(postRef, newPost);
+
+    if (images && images.length > 0) {
+      postData.images = images;
+    }
+
+    const postRef = collection(db, 'posts');
+    const docRef = await addDoc(postRef, postData);
     return docRef.id;
-  } catch (error) {
-    console.error('Error creating post:', error);
-    throw error;
-  }
 };
 
 export const getPosts = async (limit_count: number = 20): Promise<SocialPost[]> => {
-  try {
-    const postsRef = collection(db, 'posts');
-    const q = query(postsRef, orderBy('createdAt', 'desc'), limit(limit_count));
-    const snapshot = await getDocs(q);
-    
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as SocialPost));
-  } catch (error) {
-    console.error('Error fetching posts:', error);
-    return [];
-  }
+  const postsRef = collection(db, 'posts');
+  const q = query(postsRef, orderBy('createdAt', 'desc'), limit(limit_count));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPost));
 };
 
 export const likePost = async (postId: string, userId: string): Promise<void> => {
-  try {
-    const postRef = doc(db, 'posts', postId);
-    await updateDoc(postRef, {
-      likes: arrayUnion(userId)
-    });
-  } catch (error) {
-    console.error('Error liking post:', error);
-    throw error;
-  }
+  const postRef = doc(db, 'posts', postId);
+  await updateDoc(postRef, { likes: arrayUnion(userId) });
 };
 
 export const unlikePost = async (postId: string, userId: string): Promise<void> => {
-  try {
-    const postRef = doc(db, 'posts', postId);
-    await updateDoc(postRef, {
-      likes: arrayRemove(userId)
-    });
-  } catch (error) {
-    console.error('Error unliking post:', error);
-    throw error;
-  }
+  const postRef = doc(db, 'posts', postId);
+  await updateDoc(postRef, { likes: arrayRemove(userId) });
 };
 
 export const addComment = async (postId: string, authorId: string, content: string): Promise<void> => {
-  try {
-    const user = await getCurrentUser();
-    if (!user) throw new Error('User not authenticated');
-    
-    const comment: PostComment = {
-      id: `comment_${Date.now()}_${Math.random()}`,
-      authorId,
-      authorName: user.name,
-      authorAvatar: user.avatar,
-      content,
-      likes: [],
-      replies: [],
-      createdAt: new Date().toISOString()
-    };
-    
-    const postRef = doc(db, 'posts', postId);
-    await updateDoc(postRef, {
-      comments: arrayUnion(comment)
-    });
-  } catch (error) {
-    console.error('Error adding comment:', error);
-    throw error;
-  }
+  const user = await getCurrentUser();
+  if (!user) throw new Error('User not authenticated');
+  const comment: PostComment = {
+    id: `comment_${Date.now()}_${Math.random()}`,
+    authorId,
+    authorName: user.name,
+    authorAvatar: user.avatar,
+    content,
+    likes: [],
+    replies: [],
+    createdAt: new Date().toISOString()
+  };
+  const postRef = doc(db, 'posts', postId);
+  await updateDoc(postRef, { comments: arrayUnion(comment) });
 };
 
-// Friends functions
+// --- Friends Functions ---
 export const sendFriendRequest = async (fromUserId: string, toUserId: string): Promise<void> => {
-  try {
-    const fromUser = await getCurrentUser();
-    if (!fromUser) throw new Error('User not authenticated');
-    
-    const toUserRef = doc(db, 'users', toUserId);
-    const friendRequest = {
-      fromId: fromUserId,
-      fromName: fromUser.name,
-      timestamp: new Date().toISOString()
-    };
-    
-    await updateDoc(toUserRef, {
-      friendRequests: arrayUnion(friendRequest)
-    });
-    
-    // Create notification
-    await addNotification(toUserId, {
-      type: 'friend_request',
-      title: 'Neue Freundschaftsanfrage',
-      content: `${fromUser.name} möchte dein Freund werden`,
-      relatedId: fromUserId
-    });
-  } catch (error) {
-    console.error('Error sending friend request:', error);
-    throw error;
-  }
+  const fromUser = await getCurrentUser();
+  if (!fromUser) throw new Error('User not authenticated');
+  const toUserRef = doc(db, 'users', toUserId);
+  const friendRequest = {
+    fromId: fromUserId,
+    fromName: fromUser.name,
+    timestamp: new Date().toISOString()
+  };
+  await updateDoc(toUserRef, { friendRequests: arrayUnion(friendRequest) });
+  await addNotification(toUserId, {
+    type: 'friend_request',
+    title: 'Neue Freundschaftsanfrage',
+    content: `${fromUser.name} möchte dein Freund werden`,
+    relatedId: fromUserId
+  });
 };
 
 export const acceptFriendRequest = async (userId: string, friendId: string): Promise<void> => {
-  try {
-    // Add to both users' friend lists
-    const userRef = doc(db, 'users', userId);
-    const friendRef = doc(db, 'users', friendId);
-    
+  const userRef = doc(db, 'users', userId);
+  const friendRef = doc(db, 'users', friendId);
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) throw new Error("User not found");
+  const userData = userDoc.data() as User;
+  const requestToRemove = userData.friendRequests.find(req => req.fromId === friendId);
+  if (!requestToRemove) {
+    console.warn("Friend request not found, maybe already handled.");
     await Promise.all([
-      updateDoc(userRef, {
-        friends: arrayUnion(friendId),
-        friendRequests: arrayRemove({ fromId: friendId })
-      }),
-      updateDoc(friendRef, {
-        friends: arrayUnion(userId)
-      })
+      updateDoc(userRef, { friends: arrayUnion(friendId) }),
+      updateDoc(friendRef, { friends: arrayUnion(userId) })
     ]);
-  } catch (error) {
-    console.error('Error accepting friend request:', error);
-    throw error;
+    return;
   }
+  await Promise.all([
+    updateDoc(userRef, {
+      friends: arrayUnion(friendId),
+      friendRequests: arrayRemove(requestToRemove)
+    }),
+    updateDoc(friendRef, { friends: arrayUnion(userId) })
+  ]);
 };
 
 export const rejectFriendRequest = async (userId: string, friendId: string): Promise<void> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      friendRequests: arrayRemove({ fromId: friendId })
-    });
-  } catch (error) {
-    console.error('Error rejecting friend request:', error);
-    throw error;
+  const userRef = doc(db, 'users', userId);
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) throw new Error("User not found");
+  const userData = userDoc.data() as User;
+  const requestToRemove = userData.friendRequests.find(req => req.fromId === friendId);
+  if (!requestToRemove) {
+      console.warn("Friend request not found for rejection, maybe already handled.");
+      return;
   }
+  await updateDoc(userRef, { friendRequests: arrayRemove(requestToRemove) });
 };
 
-// Messaging functions
+// --- Messaging Functions ---
 export const sendPrivateMessage = async (senderId: string, receiverId: string, content: string, type: PrivateMessage['type'] = 'text'): Promise<void> => {
-  try {
-    const messageRef = collection(db, 'privateMessages');
-    const message: Omit<PrivateMessage, 'id'> = {
-      senderId,
-      receiverId,
-      content,
-      type,
-      isRead: false,
-      createdAt: new Date().toISOString()
-    };
-    
-    await addDoc(messageRef, message);
-    
-    // Create notification for receiver
-    const sender = await getCurrentUser();
-    if (sender) {
-      await addNotification(receiverId, {
-        type: 'message',
-        title: 'Neue Nachricht',
-        content: `${sender.name}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
-        relatedId: senderId
-      });
-    }
-  } catch (error) {
-    console.error('Error sending message:', error);
-    throw error;
+  const messageRef = collection(db, 'privateMessages');
+  const message: Omit<PrivateMessage, 'id'> = {
+    senderId,
+    receiverId,
+    content,
+    type,
+    isRead: false,
+    createdAt: new Date().toISOString()
+  };
+  await addDoc(messageRef, message);
+  const sender = await getCurrentUser();
+  if (sender) {
+    await addNotification(receiverId, {
+      type: 'message',
+      title: 'Neue Nachricht',
+      content: `${sender.name}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+      relatedId: senderId
+    });
   }
 };
 
 export const getPrivateMessages = async (userId1: string, userId2: string): Promise<PrivateMessage[]> => {
-  try {
-    const messagesRef = collection(db, 'privateMessages');
-    const q = query(
-      messagesRef,
-      where('senderId', 'in', [userId1, userId2]),
-      where('receiverId', 'in', [userId1, userId2]),
-      orderBy('createdAt', 'asc')
+  const messagesRef = collection(db, 'privateMessages');
+  const q = query(
+    messagesRef,
+    where('senderId', 'in', [userId1, userId2]),
+    where('receiverId', 'in', [userId1, userId2]),
+    orderBy('createdAt', 'asc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as PrivateMessage))
+    .filter(msg => 
+      (msg.senderId === userId1 && msg.receiverId === userId2) ||
+      (msg.senderId === userId2 && msg.receiverId === userId1)
     );
-    
-    const snapshot = await getDocs(q);
-    return snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() } as PrivateMessage))
-      .filter(msg => 
-        (msg.senderId === userId1 && msg.receiverId === userId2) ||
-        (msg.senderId === userId2 && msg.receiverId === userId1)
-      );
-  } catch (error) {
-    console.error('Error fetching messages:', error);
-    return [];
-  }
 };
 
-// Learning Rooms functions
-export const createLearningRoom = async (roomData: Omit<LearningRoom, 'id' | 'createdAt'>): Promise<string> => {
+// --- Learning Rooms Functions ---
+export const createLearningRoom = async (roomData: Omit<LearningRoom, 'id' | 'createdAt' | 'isActive'>): Promise<string> => {
+  console.log("Attempting to create learning room with data:", roomData);
   try {
     const roomRef = collection(db, 'learningRooms');
     const newRoom = {
@@ -747,199 +687,137 @@ export const createLearningRoom = async (roomData: Omit<LearningRoom, 'id' | 'cr
       createdAt: new Date().toISOString(),
       isActive: true
     };
-    
+    console.log("Saving new room to Firestore:", newRoom);
     const docRef = await addDoc(roomRef, newRoom);
+    console.log("Successfully created room with ID:", docRef.id);
     return docRef.id;
   } catch (error) {
-    console.error('Error creating learning room:', error);
+    console.error('!!! Firebase Error creating learning room:', error);
     throw error;
   }
 };
 
 export const joinLearningRoom = async (roomId: string, userId: string): Promise<void> => {
-  try {
-    const roomRef = doc(db, 'learningRooms', roomId);
-    await updateDoc(roomRef, {
-      participants: arrayUnion(userId)
-    });
-  } catch (error) {
-    console.error('Error joining learning room:', error);
-    throw error;
-  }
+  const roomRef = doc(db, 'learningRooms', roomId);
+  await updateDoc(roomRef, { participants: arrayUnion(userId) });
 };
 
 export const getLearningRooms = async (): Promise<LearningRoom[]> => {
-  try {
-    const roomsRef = collection(db, 'learningRooms');
-    const q = query(roomsRef, where('isActive', '==', true), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as LearningRoom));
-  } catch (error) {
-    console.error('Error fetching learning rooms:', error);
-    return [];
-  }
+  const roomsRef = collection(db, 'learningRooms');
+  const q = query(roomsRef, where('isActive', '==', true), orderBy('createdAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LearningRoom));
 };
 
-// Group Chat functions
+// --- Group Chat Functions ---
 export const createGroupChat = async (name: string, description: string, adminId: string, memberIds: string[] = []): Promise<string> => {
-  try {
-    const groupRef = collection(db, 'groupChats');
-    const newGroup: Omit<GroupChat, 'id'> = {
-      name,
-      description,
-      adminIds: [adminId],
-      memberIds: [adminId, ...memberIds],
-      createdAt: new Date().toISOString(),
-      isLearningRoom: false
-    };
-    
-    const docRef = await addDoc(groupRef, newGroup);
-    return docRef.id;
-  } catch (error) {
-    console.error('Error creating group chat:', error);
-    throw error;
-  }
+  const groupRef = collection(db, 'groupChats');
+  const newGroup: Omit<GroupChat, 'id'> = {
+    name,
+    description,
+    adminIds: [adminId],
+    memberIds: [adminId, ...memberIds],
+    createdAt: new Date().toISOString(),
+    isLearningRoom: false
+  };
+  const docRef = await addDoc(groupRef, newGroup);
+  return docRef.id;
 };
 
 export const sendGroupMessage = async (groupId: string, senderId: string, content: string, type: GroupMessage['type'] = 'text'): Promise<void> => {
-  try {
-    const user = await getCurrentUser();
-    if (!user) throw new Error('User not authenticated');
-    
-    const messageRef = collection(db, 'groupMessages');
-    const message: Omit<GroupMessage, 'id'> = {
-      groupId,
-      senderId,
-      senderName: user.name,
-      senderAvatar: user.avatar,
-      content,
-      type,
-      createdAt: new Date().toISOString(),
-      reactions: {}
-    };
-    
-    await addDoc(messageRef, message);
-    
-    // Update group's last message
-    const groupRef = doc(db, 'groupChats', groupId);
-    await updateDoc(groupRef, {
-      lastMessage: {
-        content: content.substring(0, 100),
-        senderId,
-        timestamp: new Date().toISOString()
+  const user = await getCurrentUser();
+  if (!user) throw new Error('User not authenticated');
+  
+  const messageRef = collection(db, 'groupMessages');
+  const message: Omit<GroupMessage, 'id'> = {
+    groupId,
+    senderId,
+    senderName: user.name,
+    senderAvatar: user.avatar,
+    content,
+    type,
+    createdAt: new Date().toISOString(),
+    reactions: {}
+  };
+  await addDoc(messageRef, message);
+  
+  const groupRef = doc(db, 'learningRooms', groupId);
+  const groupDoc = await getDoc(groupRef);
+  if (!groupDoc.exists()) {
+      const chatRef = doc(db, 'groupChats', groupId);
+      const chatDoc = await getDoc(chatRef);
+      if(chatDoc.exists()){
+        await updateDoc(chatRef, {
+            lastMessage: {
+              content: content.substring(0, 100),
+              senderId,
+              timestamp: new Date().toISOString()
+            }
+        });
       }
-    });
-  } catch (error) {
-    console.error('Error sending group message:', error);
-    throw error;
   }
 };
 
-// Notification functions
+// --- Notification Functions ---
 export const addNotification = async (userId: string, notification: Omit<UserNotification, 'id' | 'isRead' | 'createdAt'>): Promise<void> => {
-  try {
-    const newNotification: UserNotification = {
-      ...notification,
-      id: `notif_${Date.now()}_${Math.random()}`,
-      isRead: false,
-      createdAt: new Date().toISOString()
-    };
-    
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      notifications: arrayUnion(newNotification)
-    });
-  } catch (error) {
-    console.error('Error adding notification:', error);
-    throw error;
-  }
+  const newNotification: UserNotification = {
+    ...notification,
+    id: `notif_${Date.now()}_${Math.random()}`,
+    isRead: false,
+    createdAt: new Date().toISOString()
+  };
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, { notifications: arrayUnion(newNotification) });
 };
 
 export const markNotificationAsRead = async (userId: string, notificationId: string): Promise<void> => {
-  try {
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    if (userDoc.exists()) {
-      const userData = userDoc.data() as User;
-      const updatedNotifications = userData.notifications.map(notif => 
-        notif.id === notificationId ? { ...notif, isRead: true } : notif
-      );
-      
-      await updateDoc(doc(db, 'users', userId), {
-        notifications: updatedNotifications
-      });
-    }
-  } catch (error) {
-    console.error('Error marking notification as read:', error);
-    throw error;
+  const userDoc = await getDoc(doc(db, 'users', userId));
+  if (userDoc.exists()) {
+    const userData = userDoc.data() as User;
+    const updatedNotifications = userData.notifications.map(notif => 
+      notif.id === notificationId ? { ...notif, isRead: true } : notif
+    );
+    await updateDoc(doc(db, 'users', userId), { notifications: updatedNotifications });
   }
 };
 
-// Course functions
+// --- Course Functions ---
 export const getCourses = async (): Promise<Course[]> => {
-  try {
-    const coursesRef = collection(db, 'courses');
-    const q = query(coursesRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Course));
-  } catch (error) {
-    console.error('Error fetching courses:', error);
-    return [];
-  }
+  const coursesRef = collection(db, 'courses');
+  const q = query(coursesRef, orderBy('createdAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
 };
 
 export const enrollInCourse = async (courseId: string, userId: string): Promise<void> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const courseRef = doc(db, 'courses', courseId);
-    
-    await Promise.all([
-      updateDoc(userRef, {
-        [`learningProgress.${courseId}`]: {
-          enrolledAt: new Date().toISOString(),
-          completedLessons: [],
-          currentLesson: 0,
-          progress: 0
-        }
-      }),
-      updateDoc(courseRef, {
-        enrolledCount: increment(1)
-      })
-    ]);
-  } catch (error) {
-    console.error('Error enrolling in course:', error);
-    throw error;
-  }
+  const userRef = doc(db, 'users', userId);
+  const courseRef = doc(db, 'courses', courseId);
+  await Promise.all([
+    updateDoc(userRef, {
+      [`learningProgress.${courseId}`]: {
+        enrolledAt: new Date().toISOString(),
+        completedLessons: [],
+        currentLesson: 0,
+        progress: 0
+      }
+    }),
+    updateDoc(courseRef, { enrolledCount: increment(1) })
+  ]);
 };
 
-// Real-time listeners
+// --- Real-time Listeners ---
 export const listenToPosts = (callback: (posts: SocialPost[]) => void) => {
   const postsRef = collection(db, 'posts');
   const q = query(postsRef, orderBy('createdAt', 'desc'), limit(50));
-  
   return onSnapshot(q, (snapshot) => {
-    const posts = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as SocialPost));
+    const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPost));
     callback(posts);
   });
 };
 
 export const listenToMessages = (userId1: string, userId2: string, callback: (messages: PrivateMessage[]) => void) => {
   const messagesRef = collection(db, 'privateMessages');
-  const q = query(
-    messagesRef,
-    orderBy('createdAt', 'asc')
-  );
-  
+  const q = query(messagesRef, orderBy('createdAt', 'asc'));
   return onSnapshot(q, (snapshot) => {
     const messages = snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as PrivateMessage))
@@ -953,437 +831,240 @@ export const listenToMessages = (userId1: string, userId2: string, callback: (me
 
 export const listenToGroupMessages = (groupId: string, callback: (messages: GroupMessage[]) => void) => {
   const messagesRef = collection(db, 'groupMessages');
-  const q = query(
-    messagesRef,
-    where('groupId', '==', groupId),
-    orderBy('createdAt', 'asc')
-  );
-  
+  const q = query(messagesRef, where('groupId', '==', groupId), orderBy('createdAt', 'asc'));
   return onSnapshot(q, (snapshot) => {
-    const messages = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as GroupMessage));
+    const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GroupMessage));
     callback(messages);
   });
 };
 
-// Search functions
+export const listenToLearningRooms = (
+  callback: (rooms: LearningRoom[]) => void,
+  onError?: (error: Error) => void
+) => {
+  const roomsRef = collection(db, 'learningRooms');
+  const q = query(roomsRef, where('isActive', '==', true), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LearningRoom));
+    callback(rooms);
+  }, (error) => {
+    console.error('Error listening to learning rooms:', error);
+    if (onError) onError(error);
+  });
+};
+
+// --- Search Functions ---
 export const searchUsers = async (searchTerm: string): Promise<User[]> => {
-  try {
-    // Note: This is a simple implementation. For production, consider using Algolia or similar
-    const usersRef = collection(db, 'users');
-    const snapshot = await getDocs(usersRef);
-    
-    return snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() } as User))
-      .filter(user => 
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .slice(0, 20); // Limit results
-  } catch (error) {
-    console.error('Error searching users:', error);
-    return [];
-  }
+  const usersRef = collection(db, 'users');
+  const snapshot = await getDocs(usersRef);
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as User))
+    .filter(user => 
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .slice(0, 20);
 };
 
-// File upload helper
+// --- File Upload Helper ---
 export const uploadFile = async (file: File, path: string): Promise<string> => {
-  try {
-    const storageRef = ref(storage, path);
-    const snapshot = await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    return downloadURL;
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    throw error;
-  }
+  const storageRef = ref(storage, path);
+  const snapshot = await uploadBytes(storageRef, file);
+  return await getDownloadURL(snapshot.ref);
 };
 
-// Initialize sample data (call once)
-export const initializeSampleData = async (): Promise<void> => {
-  try {
-    // Add sample achievements
-    const achievementsRef = collection(db, 'achievements');
-    const sampleAchievements: Omit<Achievement, 'id'>[] = [
-      {
-        name: 'Erster Schritt',
-        description: 'Ersten Kurs erfolgreich abgeschlossen',
-        icon: '🎓',
-        category: 'completion',
-        requirement: { type: 'courses_completed', value: 1 },
-        reward: { xp: 100, tokens: 5 },
-        rarity: 'common'
-      },
-      {
-        name: 'Sozialer Butterfly',
-        description: '10 Freunde hinzugefügt',
-        icon: '👥',
-        category: 'social',
-        requirement: { type: 'friends_made', value: 10 },
-        reward: { xp: 200, tokens: 10 },
-        rarity: 'uncommon'
-      }
-    ];
-    
-    for (const achievement of sampleAchievements) {
-      await addDoc(achievementsRef, achievement);
-    }
-    
-    console.log('Sample data initialized');
-  } catch (error) {
-    console.error('Error initializing sample data:', error);
-  }
-};
-
-// PROGRESS TRACKING FUNCTIONS
-
-// Update lesson completion
+// --- Progress Tracking Functions ---
 export const completeLesson = async (userId: string, courseId: string, lessonId: string, timeSpent: number = 0, quizScore?: number): Promise<void> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-    
-    if (!userDoc.exists()) throw new Error('User not found');
-    
-    const userData = userDoc.data() as User;
-    const courseProgress = userData.learningProgress[courseId] || {
-      enrolledAt: new Date().toISOString(),
-      completedLessons: [],
-      currentLesson: 0,
-      progress: 0,
-      totalTimeSpent: 0,
-      lastAccessedAt: new Date().toISOString(),
-      quizScores: {}
-    };
-    
-    // Update lesson completion
-    if (!courseProgress.completedLessons.includes(lessonId)) {
-      courseProgress.completedLessons.push(lessonId);
-    }
-    
-    courseProgress.totalTimeSpent += timeSpent;
-    courseProgress.lastAccessedAt = new Date().toISOString();
-    
-    if (quizScore !== undefined) {
-      courseProgress.quizScores[lessonId] = quizScore;
-    }
-    
-    // Calculate progress percentage (assuming course has 5 lessons for now)
-    const totalLessons = 5; // This should come from the course data
-    courseProgress.progress = (courseProgress.completedLessons.length / totalLessons) * 100;
-    
-    // Award XP for lesson completion
-    const xpReward = 50;
-    const tokenReward = 2;
-    
-    await updateDoc(userRef, {
-      [`learningProgress.${courseId}`]: courseProgress,
-      xp: increment(xpReward),
-      wissensTokens: increment(tokenReward),
-      lastSeen: new Date().toISOString()
-    });
-    
-    // Check for course completion
-    if (courseProgress.progress >= 100) {
-      await completeCourse(userId, courseId);
-    }
-    
-    // Update learning streak
-    await updateLearningStreak(userId, timeSpent);
-    
-    // Check for achievements
-    await checkAchievements(userId);
-    
-  } catch (error) {
-    console.error('Error completing lesson:', error);
-    throw error;
+  const userRef = doc(db, 'users', userId);
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) throw new Error('User not found');
+  const userData = userDoc.data() as User;
+  const courseProgress = userData.learningProgress[courseId] || {
+    enrolledAt: new Date().toISOString(),
+    completedLessons: [],
+    currentLesson: 0,
+    progress: 0,
+    totalTimeSpent: 0,
+    lastAccessedAt: new Date().toISOString(),
+    quizScores: {}
+  };
+  if (!courseProgress.completedLessons.includes(lessonId)) {
+    courseProgress.completedLessons.push(lessonId);
   }
+  courseProgress.totalTimeSpent += timeSpent;
+  courseProgress.lastAccessedAt = new Date().toISOString();
+  if (quizScore !== undefined) {
+    courseProgress.quizScores[lessonId] = quizScore;
+  }
+  const totalLessons = 5; // Should come from course data
+  courseProgress.progress = (courseProgress.completedLessons.length / totalLessons) * 100;
+  await updateDoc(userRef, {
+    [`learningProgress.${courseId}`]: courseProgress,
+    xp: increment(50),
+    wissensTokens: increment(2),
+    lastSeen: new Date().toISOString()
+  });
+  if (courseProgress.progress >= 100) {
+    await completeCourse(userId, courseId);
+  }
+  await updateLearningStreak(userId, timeSpent);
+  await checkAchievements(userId);
 };
 
-// Complete entire course
 export const completeCourse = async (userId: string, courseId: string): Promise<void> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const courseCompletionXP = 500;
-    const courseCompletionTokens = 25;
-    
-    await updateDoc(userRef, {
-      [`learningProgress.${courseId}.completedAt`]: new Date().toISOString(),
-      [`learningProgress.${courseId}.certificateEarned`]: true,
-      xp: increment(courseCompletionXP),
-      wissensTokens: increment(courseCompletionTokens)
-    });
-    
-    // Create achievement post
-    await createPost(userId, `🎓 Ich habe erfolgreich den Kurs abgeschlossen!`, 'course_completion');
-    
-    // Check for achievements
-    await checkAchievements(userId);
-    
-  } catch (error) {
-    console.error('Error completing course:', error);
-    throw error;
-  }
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    [`learningProgress.${courseId}.completedAt`]: new Date().toISOString(),
+    [`learningProgress.${courseId}.certificateEarned`]: true,
+    xp: increment(500),
+    wissensTokens: increment(25)
+  });
+  await createPost(userId, `🎓 Ich habe erfolgreich den Kurs abgeschlossen!`, 'course_completion');
+  await checkAchievements(userId);
 };
 
-// Update learning streak
 export const updateLearningStreak = async (userId: string, timeSpent: number): Promise<void> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-    
-    if (!userDoc.exists()) return;
-    
-    const userData = userDoc.data() as User;
-    const today = new Date().toISOString().split('T')[0];
-    const lastActivityDate = userData.learningProgress.lastActivityDate || '';
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
-    let currentStreak = userData.learningProgress.currentStreak || 0;
-    let longestStreak = userData.learningProgress.longestStreak || 0;
-    
-    if (lastActivityDate === today) {
-      // Already learned today, just update time
-    } else if (lastActivityDate === yesterday) {
-      // Consecutive day, increase streak
-      currentStreak += 1;
-    } else {
-      // Streak broken, reset to 1
-      currentStreak = 1;
-    }
-    
-    // Update longest streak if current is higher
-    if (currentStreak > longestStreak) {
-      longestStreak = currentStreak;
-    }
-    
-    await updateDoc(userRef, {
-      'learningProgress.currentStreak': currentStreak,
-      'learningProgress.longestStreak': longestStreak,
-      'learningProgress.lastActivityDate': today,
-      'learningProgress.weeklyProgress': increment(timeSpent)
-    });
-    
-  } catch (error) {
-    console.error('Error updating learning streak:', error);
+  const userRef = doc(db, 'users', userId);
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) return;
+  const userData = userDoc.data() as User;
+  const today = new Date().toISOString().split('T')[0];
+  const lastActivityDate = userData.learningProgress.lastActivityDate || '';
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  let currentStreak = userData.learningProgress.currentStreak || 0;
+  let longestStreak = userData.learningProgress.longestStreak || 0;
+  if (lastActivityDate !== today) {
+    currentStreak = (lastActivityDate === yesterday) ? currentStreak + 1 : 1;
   }
+  if (currentStreak > longestStreak) {
+    longestStreak = currentStreak;
+  }
+  await updateDoc(userRef, {
+    'learningProgress.currentStreak': currentStreak,
+    'learningProgress.longestStreak': longestStreak,
+    'learningProgress.lastActivityDate': today,
+    'learningProgress.weeklyProgress': increment(timeSpent)
+  });
 };
 
-// Check and award achievements
 export const checkAchievements = async (userId: string): Promise<string[]> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-    
-    if (!userDoc.exists()) return [];
-    
-    const userData = userDoc.data() as User;
-    const newAchievements: string[] = [];
-    
-    // Get all available achievements
-    const achievementsRef = collection(db, 'achievements');
-    const achievementsSnapshot = await getDocs(achievementsRef);
-    
-    for (const achievementDoc of achievementsSnapshot.docs) {
-      const achievement = { id: achievementDoc.id, ...achievementDoc.data() } as Achievement;
-      
-      // Skip if already unlocked
-      if (userData.unlockedAchievements.includes(achievement.id)) continue;
-      
-      let isUnlocked = false;
-      
-      switch (achievement.requirement.type) {
-        case 'courses_completed':
-          const completedCourses = Object.values(userData.learningProgress)
-            .filter((progress: any) => progress.completedAt).length;
-          isUnlocked = completedCourses >= achievement.requirement.value;
-          break;
-          
-        case 'xp_gained':
-          isUnlocked = userData.xp >= achievement.requirement.value;
-          break;
-          
-        case 'days_streak':
-          const currentStreak = userData.learningProgress.currentStreak || 0;
-          isUnlocked = currentStreak >= achievement.requirement.value;
-          break;
-          
-        case 'friends_made':
-          isUnlocked = userData.friends.length >= achievement.requirement.value;
-          break;
-      }
-      
-      if (isUnlocked) {
-        // Award achievement
-        await updateDoc(userRef, {
-          unlockedAchievements: arrayUnion(achievement.id),
-          xp: increment(achievement.reward.xp),
-          wissensTokens: increment(achievement.reward.tokens)
-        });
-        
-        // Create notification
-        const notification: UserNotification = {
-          id: `achievement_${achievement.id}_${Date.now()}`,
-          type: 'achievement',
-          title: `Achievement freigeschaltet: ${achievement.name}`,
-          content: achievement.description,
-          isRead: false,
-          createdAt: new Date().toISOString()
-        };
-        
-        await updateDoc(userRef, {
-          notifications: arrayUnion(notification)
-        });
-        
-        // Create achievement post
-        await createPost(userId, `🏆 Neues Achievement freigeschaltet: ${achievement.name}!`, 'achievement');
-        
-        newAchievements.push(achievement.id);
-      }
+  const userRef = doc(db, 'users', userId);
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) return [];
+  const userData = userDoc.data() as User;
+  const newAchievements: string[] = [];
+  const achievementsSnapshot = await getDocs(collection(db, 'achievements'));
+  for (const achievementDoc of achievementsSnapshot.docs) {
+    const achievement = { id: achievementDoc.id, ...achievementDoc.data() } as Achievement;
+    if (userData.unlockedAchievements.includes(achievement.id)) continue;
+    let isUnlocked = false;
+    switch (achievement.requirement.type) {
+      case 'courses_completed':
+        const completed = Object.values(userData.learningProgress).filter((p: any) => p.completedAt).length;
+        isUnlocked = completed >= achievement.requirement.value;
+        break;
+      case 'xp_gained':
+        isUnlocked = userData.xp >= achievement.requirement.value;
+        break;
+      case 'days_streak':
+        isUnlocked = (userData.learningProgress.currentStreak || 0) >= achievement.requirement.value;
+        break;
+      case 'friends_made':
+        isUnlocked = userData.friends.length >= achievement.requirement.value;
+        break;
     }
-    
-    return newAchievements;
-    
-  } catch (error) {
-    console.error('Error checking achievements:', error);
-    return [];
-  }
-};
-
-// Get user statistics
-export const getUserStats = async (userId: string): Promise<UserStats | null> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-    
-    if (!userDoc.exists()) return null;
-    
-    const userData = userDoc.data() as User;
-    const learningProgress = userData.learningProgress || {};
-    
-    let totalCoursesCompleted = 0;
-    let totalTimeSpent = 0;
-    let totalQuizScore = 0;
-    let quizCount = 0;
-    let certificatesEarned = 0;
-    
-    Object.values(learningProgress).forEach((progress: any) => {
-      if (progress.completedAt) {
-        totalCoursesCompleted++;
-      }
-      if (progress.certificateEarned) {
-        certificatesEarned++;
-      }
-      if (progress.totalTimeSpent) {
-        totalTimeSpent += progress.totalTimeSpent;
-      }
-      if (progress.quizScores) {
-        Object.values(progress.quizScores).forEach((score: any) => {
-          totalQuizScore += score;
-          quizCount++;
-        });
-      }
-    });
-    
-    const stats: UserStats = {
-      totalCoursesCompleted,
-      totalTimeSpent,
-      totalXpEarned: userData.xp,
-      totalTokensEarned: userData.wissensTokens,
-      averageQuizScore: quizCount > 0 ? totalQuizScore / quizCount : 0,
-      certificatesEarned,
-      learningStreak: {
-        currentStreak: learningProgress.currentStreak || 0,
-        longestStreak: learningProgress.longestStreak || 0,
-        lastActivityDate: learningProgress.lastActivityDate || '',
-        weeklyGoal: 300, // 5 hours default
-        weeklyProgress: learningProgress.weeklyProgress || 0
-      },
-      monthlyStats: {} // Could be implemented later
-    };
-    
-    return stats;
-    
-  } catch (error) {
-    console.error('Error getting user stats:', error);
-    return null;
-  }
-};
-
-// Get leaderboard
-export const getLeaderboard = async (type: 'xp' | 'courses' | 'streak' = 'xp', limitCount: number = 50): Promise<Leaderboard[]> => {
-  try {
-    const usersRef = collection(db, 'users');
-    let q;
-    
-    switch (type) {
-      case 'xp':
-        q = query(usersRef, orderBy('xp', 'desc'), limit(limitCount));
-        break;
-      case 'courses':
-        // This would need to be calculated differently in a real app
-        q = query(usersRef, orderBy('xp', 'desc'), limit(limitCount));
-        break;
-      case 'streak':
-        // This would also need custom calculation
-        q = query(usersRef, orderBy('xp', 'desc'), limit(limitCount));
-        break;
-      default:
-        q = query(usersRef, orderBy('xp', 'desc'), limit(limitCount));
-    }
-    
-    const snapshot = await getDocs(q);
-    const leaderboard: Leaderboard[] = [];
-    
-    snapshot.docs.forEach((doc, index) => {
-      const userData = doc.data() as User;
-      leaderboard.push({
-        id: doc.id,
-        userId: userData.id,
-        userName: userData.name,
-        userAvatar: userData.avatar,
-        score: userData.xp,
-        rank: index + 1,
-        type,
-        period: 'all-time'
+    if (isUnlocked) {
+      newAchievements.push(achievement.id);
+      await updateDoc(userRef, {
+        unlockedAchievements: arrayUnion(achievement.id),
+        xp: increment(achievement.reward.xp),
+        wissensTokens: increment(achievement.reward.tokens)
       });
-    });
-    
-    return leaderboard;
-    
-  } catch (error) {
-    console.error('Error getting leaderboard:', error);
-    return [];
+    }
   }
+  return newAchievements;
 };
 
-// Get all achievements
+export const getUserStats = async (userId: string): Promise<UserStats | null> => {
+  const userDoc = await getDoc(doc(db, 'users', userId));
+  if (!userDoc.exists()) return null;
+  const userData = userDoc.data() as User;
+  const lp = userData.learningProgress || {};
+  let totalCoursesCompleted = 0, totalTimeSpent = 0, totalQuizScore = 0, quizCount = 0, certificatesEarned = 0;
+  Object.values(lp).forEach((p: any) => {
+    if (p.completedAt) totalCoursesCompleted++;
+    if (p.certificateEarned) certificatesEarned++;
+    totalTimeSpent += p.totalTimeSpent || 0;
+    if (p.quizScores) {
+      const scores = Object.values(p.quizScores) as number[];
+      totalQuizScore += scores.reduce((a, b) => a + b, 0);
+      quizCount += scores.length;
+    }
+  });
+  return {
+    totalCoursesCompleted,
+    totalTimeSpent,
+    totalXpEarned: userData.xp,
+    totalTokensEarned: userData.wissensTokens,
+    averageQuizScore: quizCount > 0 ? totalQuizScore / quizCount : 0,
+    certificatesEarned,
+    learningStreak: {
+      currentStreak: lp.currentStreak || 0,
+      longestStreak: lp.longestStreak || 0,
+      lastActivityDate: lp.lastActivityDate || '',
+      weeklyGoal: 300,
+      weeklyProgress: lp.weeklyProgress || 0
+    },
+    monthlyStats: {}
+  };
+};
+
+export const getLeaderboard = async (type: 'xp' | 'courses' | 'streak' = 'xp', limitCount: number = 50): Promise<Leaderboard[]> => {
+  const usersRef = collection(db, 'users');
+  let q;
+  if (type === 'xp') {
+      q = query(usersRef, orderBy('xp', 'desc'), limit(limitCount));
+  } else {
+      q = query(usersRef, limit(200));
+  }
+  const snapshot = await getDocs(q);
+  let users = snapshot.docs.map(doc => doc.data() as User);
+  if (type === 'courses') {
+      users.sort((a, b) => Object.values(b.learningProgress).filter((p: any) => p.completedAt).length - Object.values(a.learningProgress).filter((p: any) => p.completedAt).length);
+  } else if (type === 'streak') {
+      users.sort((a, b) => (b.learningProgress.currentStreak || 0) - (a.learningProgress.currentStreak || 0));
+  }
+  return users.slice(0, limitCount).map((user, index) => ({
+      id: user.id,
+      userId: user.id,
+      userName: user.name,
+      userAvatar: user.avatar,
+      score: type === 'xp' ? user.xp : (type === 'courses' ? Object.values(user.learningProgress).filter((p: any) => p.completedAt).length : (user.learningProgress.currentStreak || 0)),
+      rank: index + 1,
+      type,
+      period: 'all-time'
+  }));
+};
+
 export const getAllAchievements = async (): Promise<Achievement[]> => {
-  try {
-    const achievementsRef = collection(db, 'achievements');
-    const snapshot = await getDocs(achievementsRef);
-    
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Achievement));
-    
-  } catch (error) {
-    console.error('Error getting achievements:', error);
-    return [];
-  }
+  const snapshot = await getDocs(collection(db, 'achievements'));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Achievement));
 };
 
-// Weekly progress reset (would be called by a scheduled function)
 export const resetWeeklyProgress = async (userId: string): Promise<void> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      'learningProgress.weeklyProgress': 0
-    });
-  } catch (error) {
-    console.error('Error resetting weekly progress:', error);
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, { 'learningProgress.weeklyProgress': 0 });
+};
+
+// --- Sample Data Initialization ---
+export const initializeSampleData = async (): Promise<void> => {
+  const achievementsRef = collection(db, 'achievements');
+  const sampleAchievements: Omit<Achievement, 'id'>[] = [
+    { name: 'Erster Schritt', description: 'Ersten Kurs erfolgreich abgeschlossen', icon: '🎓', category: 'completion', requirement: { type: 'courses_completed', value: 1 }, reward: { xp: 100, tokens: 5 }, rarity: 'common' },
+    { name: 'Sozialer Schmetterling', description: '10 Freunde hinzugefügt', icon: '👥', category: 'social', requirement: { type: 'friends_made', value: 10 }, reward: { xp: 200, tokens: 10 }, rarity: 'uncommon' }
+  ];
+  for (const achievement of sampleAchievements) {
+    await addDoc(achievementsRef, achievement);
   }
+  console.log('Sample data initialized');
 };

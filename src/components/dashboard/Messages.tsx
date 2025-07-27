@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, PrivateMessage, getPrivateMessages, sendPrivateMessage, searchUsers } from "@/lib/firebase";
+import { User, PrivateMessage, sendPrivateMessage, searchUsers, listenToMessages, getUserDataById } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,95 +27,64 @@ interface MessagesProps {
 }
 
 interface Conversation {
-  id: string;
-  name: string;
-  avatar: string;
+  partner: User;
   lastMessage?: string;
   lastMessageTime?: string;
   unreadCount: number;
-  isOnline: boolean;
 }
 
 export default function Messages({ user }: MessagesProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversation, setActiveConversation] = useState<string | null>(null);
+  const [activeConversationPartner, setActiveConversationPartner] = useState<User | null>(null);
   const [messages, setMessages] = useState<PrivateMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [showNewChat, setShowNewChat] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState(true);
 
+  // Lade die Freunde des Benutzers als Konversationen
   useEffect(() => {
-    loadConversations();
-  }, []);
-
-  useEffect(() => {
-    if (activeConversation) {
-      loadMessages(activeConversation);
-    }
-  }, [activeConversation]);
-
-  const loadConversations = async () => {
-    // This would typically load from a conversations collection
-    // For now, we'll use a mock implementation
-    const mockConversations: Conversation[] = [
-      {
-        id: "conv1",
-        name: "Maria Schmidt",
-        avatar: "MS",
-        lastMessage: "Super, danke für die Hilfe!",
-        lastMessageTime: new Date(Date.now() - 3600000).toISOString(),
-        unreadCount: 2,
-        isOnline: true
-      },
-      {
-        id: "conv2", 
-        name: "Thomas Müller",
-        avatar: "TM",
-        lastMessage: "Können wir morgen über das Projekt sprechen?",
-        lastMessageTime: new Date(Date.now() - 7200000).toISOString(),
-        unreadCount: 0,
-        isOnline: false
-      },
-      {
-        id: "conv3",
-        name: "Elena Rodriguez",
-        avatar: "ER",
-        lastMessage: "Hast du die Lösung für Aufgabe 3?",
-        lastMessageTime: new Date(Date.now() - 86400000).toISOString(),
-        unreadCount: 1,
-        isOnline: true
+    const loadFriendsAsConversations = async () => {
+      if (!user || !user.friends || user.friends.length === 0) {
+        setLoadingConversations(false);
+        return;
       }
-    ];
-    setConversations(mockConversations);
-  };
 
-  const loadMessages = async (conversationId: string) => {
-    try {
-      // For a real implementation, you'd need to map conversation IDs to user IDs
-      const userId = conversationId === "conv1" ? "user1" : 
-                   conversationId === "conv2" ? "user2" : "user3";
-      
-      const fetchedMessages = await getPrivateMessages(user.id, userId);
-      setMessages(fetchedMessages);
-    } catch (error) {
-      console.error("Error loading messages:", error);
+      setLoadingConversations(true);
+      const friendPromises = user.friends.map(friendId => getUserDataById(friendId));
+      const friends = (await Promise.all(friendPromises)).filter(Boolean) as User[];
+
+      const convs: Conversation[] = friends.map(friend => ({
+        partner: friend,
+        unreadCount: 0, // Dies müsste man komplexer implementieren
+      }));
+      setConversations(convs);
+      setLoadingConversations(false);
+    };
+
+    loadFriendsAsConversations();
+  }, [user]);
+
+  // Richte einen Listener für neue Nachrichten ein, wenn eine Konversation aktiv ist
+  useEffect(() => {
+    if (activeConversationPartner) {
+      const unsubscribe = listenToMessages(user.id, activeConversationPartner.id, (fetchedMessages) => {
+        setMessages(fetchedMessages);
+      });
+      // Cleanup-Funktion, um den Listener zu entfernen, wenn die Komponente unmounted wird
+      return () => unsubscribe();
     }
-  };
+  }, [activeConversationPartner, user.id]);
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !activeConversation) return;
+    if (!newMessage.trim() || !activeConversationPartner) return;
 
     setLoading(true);
     try {
-      const userId = activeConversation === "conv1" ? "user1" : 
-                    activeConversation === "conv2" ? "user2" : "user3";
-      
-      await sendPrivateMessage(user.id, userId, newMessage);
+      await sendPrivateMessage(user.id, activeConversationPartner.id, newMessage);
       setNewMessage("");
-      await loadMessages(activeConversation);
-      await loadConversations(); // Update conversation list
     } catch (error) {
       console.error("Error sending message:", error);
     } finally {
@@ -138,36 +107,28 @@ export default function Messages({ user }: MessagesProps) {
   };
 
   const startNewConversation = (selectedUser: User) => {
-    // Add to conversations and switch to it
-    const newConv: Conversation = {
-      id: `conv_${selectedUser.id}`,
-      name: selectedUser.name,
-      avatar: selectedUser.avatar,
-      unreadCount: 0,
-      isOnline: selectedUser.status === 'online'
-    };
+    if (!conversations.some(c => c.partner.id === selectedUser.id)) {
+      const newConv: Conversation = {
+        partner: selectedUser,
+        unreadCount: 0,
+      };
+      setConversations(prev => [newConv, ...prev]);
+    }
     
-    setConversations(prev => [newConv, ...prev]);
-    setActiveConversation(newConv.id);
+    setActiveConversationPartner(selectedUser);
     setShowNewChat(false);
     setSearchTerm("");
     setSearchResults([]);
   };
 
-  const activeConv = conversations.find(c => c.id === activeConversation);
-
   return (
     <div className="flex h-full bg-background">
       {/* Conversations Sidebar */}
       <div className="w-80 border-r border-border flex flex-col">
-        {/* Header */}
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Nachrichten</h2>
-            <Button 
-              size="sm" 
-              onClick={() => setShowNewChat(!showNewChat)}
-            >
+            <Button size="sm" onClick={() => setShowNewChat(!showNewChat)}>
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -206,98 +167,95 @@ export default function Messages({ user }: MessagesProps) {
           )}
         </div>
 
-        {/* Conversations List */}
         <ScrollArea className="flex-1">
           <div className="p-2">
-            {conversations.map((conversation) => (
-              <div
-                key={conversation.id}
-                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-muted/50 ${
-                  activeConversation === conversation.id ? 'bg-muted' : ''
-                }`}
-                onClick={() => setActiveConversation(conversation.id)}
-              >
-                <div className="relative">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                      {conversation.avatar}
-                    </AvatarFallback>
-                  </Avatar>
-                  {conversation.isOnline && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-background rounded-full"></div>
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium truncate">{conversation.name}</p>
-                    {conversation.lastMessageTime && (
-                      <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(conversation.lastMessageTime), { 
-                          addSuffix: true, 
-                          locale: de 
-                        })}
+            {loadingConversations ? (
+              <p className="p-4 text-center text-sm text-muted-foreground">Lade Konversationen...</p>
+            ) : conversations.length > 0 ? (
+              conversations.map((conversation) => (
+                <div
+                  key={conversation.partner.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-muted/50 ${
+                    activeConversationPartner?.id === conversation.partner.id ? 'bg-muted' : ''
+                  }`}
+                  onClick={() => setActiveConversationPartner(conversation.partner)}
+                >
+                  <div className="relative">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                        {conversation.partner.avatar}
+                      </AvatarFallback>
+                    </Avatar>
+                    {conversation.partner.status === 'online' && (
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-background rounded-full"></div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium truncate">{conversation.partner.name}</p>
+                      {conversation.lastMessageTime && (
+                        <p className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(conversation.lastMessageTime), { 
+                            addSuffix: true, 
+                            locale: de 
+                          })}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground truncate">
+                        {conversation.lastMessage || "Noch keine Nachrichten"}
                       </p>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground truncate">
-                      {conversation.lastMessage || "Noch keine Nachrichten"}
-                    </p>
-                    {conversation.unreadCount > 0 && (
-                      <Badge variant="destructive" className="ml-2 px-2 h-5 text-xs">
-                        {conversation.unreadCount}
-                      </Badge>
-                    )}
+                      {conversation.unreadCount > 0 && (
+                        <Badge variant="destructive" className="ml-2 px-2 h-5 text-xs">
+                          {conversation.unreadCount}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+               <p className="p-4 text-center text-sm text-muted-foreground">Keine Konversationen gefunden. Finde neue Freunde!</p>
+            )}
           </div>
         </ScrollArea>
       </div>
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        {activeConv ? (
+        {activeConversationPartner ? (
           <>
-            {/* Chat Header */}
             <div className="p-4 border-b border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {activeConv.avatar}
+                        {activeConversationPartner.avatar}
                       </AvatarFallback>
                     </Avatar>
-                    {activeConv.isOnline && (
+                    {activeConversationPartner.status === 'online' && (
                       <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
                     )}
                   </div>
                   <div>
-                    <p className="font-medium">{activeConv.name}</p>
+                    <p className="font-medium">{activeConversationPartner.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {activeConv.isOnline ? "Online" : "Offline"}
+                      {activeConversationPartner.status === 'online' ? "Online" : "Offline"}
                     </p>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm">
-                    <Phone className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <Video className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  <Button variant="ghost" size="sm"><Phone className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm"><Video className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm"><MoreHorizontal className="h-4 w-4" /></Button>
                 </div>
               </div>
             </div>
 
-            {/* Messages */}
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
                 {messages.length === 0 ? (
@@ -317,7 +275,7 @@ export default function Messages({ user }: MessagesProps) {
                         {!isOwn && (
                           <Avatar className="h-8 w-8">
                             <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs">
-                              {activeConv.avatar}
+                              {activeConversationPartner.avatar}
                             </AvatarFallback>
                           </Avatar>
                         )}
@@ -367,15 +325,10 @@ export default function Messages({ user }: MessagesProps) {
               </div>
             </ScrollArea>
 
-            {/* Message Input */}
             <div className="p-4 border-t border-border">
               <div className="flex items-end gap-2">
-                <Button variant="ghost" size="sm">
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Smile className="h-4 w-4" />
-                </Button>
+                <Button variant="ghost" size="sm"><Paperclip className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="sm"><Smile className="h-4 w-4" /></Button>
                 
                 <div className="flex-1 flex gap-2">
                   <Input

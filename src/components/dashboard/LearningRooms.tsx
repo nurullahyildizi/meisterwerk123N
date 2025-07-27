@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { User, LearningRoom, GroupMessage, createLearningRoom, getLearningRooms, joinLearningRoom, sendGroupMessage, listenToGroupMessages } from "@/lib/firebase";
+// HINWEIS: Fügen Sie 'listenToLearningRooms' zu Ihren Firebase-Importen hinzu
+import { User, LearningRoom, GroupMessage, createLearningRoom, listenToLearningRooms, joinLearningRoom, sendGroupMessage, listenToGroupMessages } from "@/lib/firebase";
 import InteractiveWhiteboard from "../whiteboard/InteractiveWhiteboard";
 import LiveStreamRoom from "../live/LiveStreamRoom";
 import { formatDistanceToNow } from "date-fns";
@@ -16,10 +17,6 @@ import {
   Video,
   Users,
   Plus,
-  Calendar,
-  Clock,
-  BookOpen,
-  Settings,
   Mic,
   MicOff,
   VideoOff,
@@ -39,7 +36,8 @@ interface LearningRoomsProps {
 export default function LearningRooms({ user }: LearningRoomsProps) {
   const [rooms, setRooms] = useState<LearningRoom[]>([]);
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // KORREKTUR: Der Ladezustand wird initial auf 'true' gesetzt.
+  const [loading, setLoading] = useState(true);
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isAudioOn, setIsAudioOn] = useState(true);
@@ -59,8 +57,19 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
   const [newChatMessage, setNewChatMessage] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
+  // KORREKTUR: Verwendet jetzt einen Echtzeit-Listener, um die Räume dynamisch zu aktualisieren.
   useEffect(() => {
-    loadRooms();
+    setLoading(true);
+    const unsubscribe = listenToLearningRooms((fetchedRooms) => {
+      setRooms(fetchedRooms);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error listening to learning rooms:", error);
+      setLoading(false);
+    });
+
+    // Wichtig: Die Listener-Funktion beim Verlassen der Komponente beenden
+    return () => unsubscribe();
   }, []);
 
   // Listen to chat messages when active room changes
@@ -72,15 +81,6 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
       return () => unsubscribe();
     }
   }, [activeRoom]);
-
-  const loadRooms = async () => {
-    try {
-      const fetchedRooms = await getLearningRooms();
-      setRooms(fetchedRooms);
-    } catch (error) {
-      console.error("Error loading learning rooms:", error);
-    }
-  };
 
   const handleCreateRoom = async () => {
     if (!newRoomData.name.trim() || !newRoomData.description.trim()) return;
@@ -106,12 +106,12 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
         isPrivate: false
       });
       setShowCreateRoom(false);
-      await loadRooms();
+      // Kein manuelles Neuladen mehr nötig, da der Listener die Liste automatisch aktualisiert.
       setActiveRoom(roomId);
     } catch (error) {
       console.error("Error creating room:", error);
     } finally {
-      setLoading(false);
+      // setLoading(false) wird vom Listener übernommen
     }
   };
 
@@ -119,7 +119,7 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
     try {
       await joinLearningRoom(roomId, user.id);
       setActiveRoom(roomId);
-      await loadRooms();
+      // Kein manuelles Neuladen nötig
     } catch (error) {
       console.error("Error joining room:", error);
     }
@@ -153,6 +153,18 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
     "Qualitätssicherung",
     "Sonstiges"
   ];
+
+  // KORREKTUR: Zeigt eine Ladeanzeige, während die Daten aus Firestore geladen werden.
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Lernräume werden geladen...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full bg-background">
@@ -236,7 +248,6 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
 
         {/* Rooms List */}
         <div className="flex-1 overflow-y-auto p-2">
-          <>
             {rooms.map((room) => {
               const isParticipant = room.participants.includes(user.id);
               const isActive = activeRoom === room.id;
@@ -292,8 +303,9 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
                 </Card>
               );
             })}
-
-            {rooms.length === 0 && (
+            
+            {/* KORREKTUR: Diese Nachricht wird nur angezeigt, wenn das Laden abgeschlossen ist UND keine Räume vorhanden sind. */}
+            {rooms.length === 0 && !loading && (
               <div className="text-center py-8">
                 <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-sm text-muted-foreground">Noch keine Lernräume</p>
@@ -306,7 +318,6 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
                 </Button>
               </div>
             )}
-          </>
         </div>
       </div>
 
@@ -380,7 +391,6 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
                     {/* Video Grid */}
                     <div className="flex-1 bg-muted/20 p-4">
                       <div className="grid grid-cols-2 gap-4 h-full">
-                        {/* Main Video */}
                         <div className="col-span-2 bg-muted rounded-lg flex items-center justify-center">
                           <div className="text-center">
                             <Video className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
@@ -439,11 +449,9 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
                             isInstructor={activeRoomData.instructors.includes(user.id)}
                             participants={activeRoomData.participants}
                             onSave={(data) => {
-                              // Save whiteboard data to Firebase
                               console.log('Saving whiteboard data:', data);
                             }}
                             onShare={() => {
-                              // Share whiteboard
                               console.log('Sharing whiteboard');
                             }}
                           />
@@ -585,18 +593,8 @@ export default function LearningRooms({ user }: LearningRoomsProps) {
                         <FileText className="h-4 w-4" />
                         Materialien
                       </h3>
-
                       <div className="space-y-2">
-                        <Button variant="outline" size="sm" className="w-full justify-start">
-                          <BookOpen className="h-4 w-4 mr-2" />
-                          Kursunterlagen.pdf
-                        </Button>
-
-                        <Button variant="outline" size="sm" className="w-full justify-start">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Übungsblatt_01.pdf
-                        </Button>
-
+                         {/* Dynamische Ressourcenliste hier einfügen */}
                         <Button variant="ghost" size="sm" className="w-full">
                           <Plus className="h-4 w-4 mr-2" />
                           Material hochladen
