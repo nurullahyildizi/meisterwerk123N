@@ -12,7 +12,7 @@ import {
   Medal,
   Crown,
   Zap,
-  Fire,
+  Flame,
   Target,
   BookOpen,
   Users,

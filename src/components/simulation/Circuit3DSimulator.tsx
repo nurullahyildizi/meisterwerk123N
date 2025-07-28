@@ -36,9 +36,10 @@ interface CircuitComponent {
 
 interface Circuit3DSimulatorProps {
   circuitType?: 'series' | 'parallel';
+  lessonId?: string;
 }
 
-export default function Circuit3DSimulator({ circuitType = 'series' }: Circuit3DSimulatorProps) {
+export default function Circuit3DSimulator({ circuitType = 'series', lessonId }: Circuit3DSimulatorProps) {
   const [isSimulating, setIsSimulating] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [showValues, setShowValues] = useState(true);
@@ -84,7 +85,7 @@ export default function Circuit3DSimulator({ circuitType = 'series' }: Circuit3D
       if (comp.type === 'battery') {
         return { ...comp, voltage: comp.value, current: 0.1 };
       } else if (comp.type === 'resistor' && comp.value) {
-        const current = battery.value / comp.value;
+        const current = (battery.value || 0) / (comp.value || 1);
         const power = current * current * comp.value;
         return { ...comp, current, voltage: current * comp.value, power };
       } else if (comp.type === 'led') {

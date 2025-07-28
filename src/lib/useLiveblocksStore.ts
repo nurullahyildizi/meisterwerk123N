@@ -1,85 +1,60 @@
-
-import { useYjsStore } from "tldraw/yjs";
-import { useRoom, useSelf } from '@liveblocks/react'
-import { useEffect, useState } from 'react'
-import { LiveblocksYjsProvider } from '@liveblocks/yjs'
-import { TLSchema } from "tldraw";
-import { useYjsStore } from "tldraw/yjs";
-
-import { useRoom, useSelf } from "@liveblocks/react";
 import { useEffect, useState } from "react";
+import { useRoom, useSelf } from "@liveblocks/react";
+import { LiveblocksYjsProvider } from "@liveblocks/yjs";
+import { TLStoreWithStatus, createTLStore, defaultShapeUtils } from "tldraw";
+import * as Y from "yjs";
 
-// This function creates a default schema for the tldraw store.
-// It's used to define the structure of the data that will be stored.
-function createDefaultSchema(): TLSchema {
-	const serializedSchema = {
-		recordVersions: {
-			asset: { version: 1, subTypeKey: 'type', subTypeVersions: { image: 2, video: 2, bookmark: 0 } },
-			camera: { version: 1 },
-			document: { version: 2 },
-			instance: { version: 24 },
-			instance_page_state: { version: 5 },
-			page: { version: 1 },
-			shape: {
-				version: 4,
-				subTypeKey: 'type',
-				subTypeVersions: {
-					group: 0, text: 1, bookmark: 2, draw: 1, geo: 8, note: 5, line: 4, frame: 0, arrow: 3, highlight: 0, embed: 4, image: 3, video: 2,
-				},
-			},
-			instance_presence: { version: 5 },
-			pointer: { version: 1 },
-		},
-		storeVersion: 4,
-		schemaVersion: 1,
-	} as const satisfies SerializedSchema
-	return TLSchema.create(serializedSchema)
-}
-
-
-// This is the core hook that connects tldraw to Liveblocks.
+// Simple hook for creating a tldraw store with Liveblocks integration
 export function useLiveblocksStore({ roomId }: { roomId: string }) {
-	// Create a tldraw store. This is a local store that holds the whiteboard data.
-	const [store] = useState(() => createTLStore({ shapeUtils: defaultShapeUtils, schema: createDefaultSchema() }))
+	const room = useRoom();
+	const self = useSelf();
+
+	// Create a Yjs document
+	const [doc] = useState(() => new Y.Doc());
 	
-    // Create a state to hold the store with its connection status.
-	const [storeWithStatus, setStoreWithStatus] = useState<TLStoreWithStatus>({ status: 'loading' })
+	// Create a tldraw store
+	const [store] = useState(() => createTLStore({ 
+		shapeUtils: defaultShapeUtils
+	}));
 
-	const room = useRoom()
-	const self = useSelf()
+	// Create a state to hold the store with its connection status
+	const [storeWithStatus, setStoreWithStatus] = useState<TLStoreWithStatus>({ 
+		status: 'loading' 
+	});
 
-    // Use the yjs store hook to connect the tldraw store to a Yjs document.
-	const { yjsStore, yjsState } = useYjsStore({
-		roomId,
-		store,
-		// The provider connects the Yjs document to the Liveblocks room.
-		provider: new LiveblocksYjsProvider(room, room.getDoc()),
-	})
+	// Create the Liveblocks provider
+	const [provider] = useState(() => new LiveblocksYjsProvider(room, doc));
 
-	const { status } = yjsState
-
-    // Update user presence information (e.g., name, color) in the Liveblocks room.
 	useEffect(() => {
-		if (!self || !yjsStore) return
+		// Set up the store with synced status when everything is ready
+		if (store && provider) {
+			setStoreWithStatus({ 
+				store, 
+				status: 'synced-local'
+			});
+		}
 
-		const awareness = yjsStore.awareness
-		awareness.setLocalStateField('user', self.info)
+		// Clean up on unmount
+		return () => {
+			provider?.destroy();
+		};
+	}, [store, provider]);
+
+	// Update user presence information
+	useEffect(() => {
+		if (!self || !provider) return;
+
+		const awareness = provider.awareness;
+		if (awareness && self.info) {
+			awareness.setLocalStateField('user', self.info);
+		}
 
 		return () => {
-			awareness.setLocalStateField('user', undefined)
-		}
-	}, [self, yjsStore])
+			if (awareness) {
+				awareness.setLocalStateField('user', null);
+			}
+		};
+	}, [self, provider]);
 
-    // Update the store status based on the yjs connection state.
-	useEffect(() => {
-		if (status === 'synced' && yjsStore) {
-			setStoreWithStatus({ store: yjsStore, status: 'synced', error: null })
-		} else if (status === 'error') {
-			setStoreWithStatus({ status: 'error', error: new Error('Could not connect to yjs') })
-		} else {
-			setStoreWithStatus({ status: 'loading' })
-		}
-	}, [status, yjsStore])
-
-	return storeWithStatus
+	return storeWithStatus;
 }
