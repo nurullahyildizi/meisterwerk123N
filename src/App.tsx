@@ -1,30 +1,43 @@
 import { useEffect, useState } from "react";
 import { User, onAuthStateChange, getCurrentUser } from "@/lib/firebase";
+import { mockAuth, MockUser } from "@/lib/mockAuth";
 import AuthPage from "@/components/auth/AuthPage";
 import Dashboard from "@/components/dashboard/Dashboard";
 import { ThemeProvider } from "@/components/theme-provider";
 
+// Use mock auth for demo purposes - set to false to use real Firebase
+const USE_MOCK_AUTH = true;
+
 function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | MockUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const userData = await getCurrentUser();
-          setUser(userData);
-        } catch (error) {
-          console.error('Error getting user data:', error);
+    if (USE_MOCK_AUTH) {
+      // Use mock authentication for demo
+      const unsubscribe = mockAuth.onAuthStateChange((mockUser) => {
+        setUser(mockUser);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    } else {
+      // Use real Firebase authentication
+      const unsubscribe = onAuthStateChange(async (firebaseUser) => {
+        if (firebaseUser) {
+          try {
+            const userData = await getCurrentUser();
+            setUser(userData);
+          } catch (error) {
+            console.error('Error getting user data:', error);
+            setUser(null);
+          }
+        } else {
           setUser(null);
         }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }
   }, []);
 
   if (loading) {

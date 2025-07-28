@@ -7,6 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, Zap, BookOpen, Users, Trophy } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { loginWithEmailAndPassword, registerWithEmailAndPassword } from "@/lib/firebase";
+import { mockAuth } from "@/lib/mockAuth";
+
+// Use mock auth for demo purposes - set to false to use real Firebase
+const USE_MOCK_AUTH = true;
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +30,9 @@ export default function AuthPage() {
     setIsLoading(true);
     setError("");
     
-    const result = await loginWithEmailAndPassword(loginEmail, loginPassword);
+    const result = USE_MOCK_AUTH 
+      ? await mockAuth.signIn(loginEmail, loginPassword)
+      : await loginWithEmailAndPassword(loginEmail, loginPassword);
     
     if (!result.success) {
       setError(result.error || "Login fehlgeschlagen");
@@ -46,7 +52,9 @@ export default function AuthPage() {
       return;
     }
     
-    const result = await registerWithEmailAndPassword(registerName, registerEmail, registerPassword);
+    const result = USE_MOCK_AUTH
+      ? await mockAuth.signUp(registerName, registerEmail, registerPassword)
+      : await registerWithEmailAndPassword(registerName, registerEmail, registerPassword);
     
     if (!result.success) {
       setError(result.error || "Registrierung fehlgeschlagen");
@@ -90,6 +98,18 @@ export default function AuthPage() {
               <span>Zertifizierte Abschlüsse und Qualifikationen</span>
             </div>
           </div>
+          
+          {USE_MOCK_AUTH && (
+            <div className="mt-8 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+              <h3 className="font-semibold text-primary mb-2">🚀 Demo-Modus</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Testen Sie die Plattform mit den vorausgefüllten Demo-Zugangsdaten →
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Oder erstellen Sie ein neues Konto - alle Daten sind nur temporär gespeichert.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import VideoPlayer, { LiveChatPanel } from "@/components/video/VideoPlayer";
+import InteractiveVideoPlayer from "@/components/video/InteractiveVideoPlayer";
+import Circuit3DSimulator from "@/components/simulation/Circuit3DSimulator";
 import { 
   BookOpen, 
   Play, 
@@ -28,7 +30,8 @@ import {
   MessageSquare,
   Settings,
   Maximize,
-  X as XIcon
+  X as XIcon,
+  CircuitBoard
 } from "lucide-react";
 
 
@@ -209,7 +212,7 @@ export default function CourseViewer({ courseId, user, onBack }: CourseViewerPro
                       {lesson.type === 'video' && <Video className="h-3 w-3 text-muted-foreground" />}
                       {lesson.type === 'text' && <FileText className="h-3 w-3 text-muted-foreground" />}
                       {lesson.type === 'quiz' && <HelpCircle className="h-3 w-3 text-muted-foreground" />}
-                      {lesson.type === 'simulation' && <Settings className="h-3 w-3 text-muted-foreground" />}
+                      {lesson.type === 'simulation' && <CircuitBoard className="h-3 w-3 text-muted-foreground" />}
                       
                       <span className="text-xs text-muted-foreground">{lesson.duration}min</span>
                     </div>
@@ -351,10 +354,29 @@ export default function CourseViewer({ courseId, user, onBack }: CourseViewerPro
               <div className="p-6">
                 {currentLesson.type === 'video' && (
                   <div className="space-y-6">
-                    <VideoPlayer
+                    <InteractiveVideoPlayer
                       url={currentLesson.content.videoUrl || "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"}
                       title={currentLesson.title}
                       description={currentLesson.description}
+                      chapters={[
+                        { id: 'ch1', title: 'Einführung', startTime: 0, endTime: 120, description: 'Grundlagen der Elektrotechnik' },
+                        { id: 'ch2', title: 'Ohmsche Gesetz', startTime: 120, endTime: 300, description: 'Beziehung zwischen Spannung, Strom und Widerstand' },
+                        { id: 'ch3', title: 'Praktische Beispiele', startTime: 300, endTime: 480, description: 'Anwendung in realen Schaltungen' },
+                        { id: 'ch4', title: 'Übungsaufgaben', startTime: 480, endTime: 600, description: 'Vertiefung des Gelernten' }
+                      ]}
+                      annotations={[
+                        { id: 'note1', time: 60, type: 'note', title: 'Wichtiger Hinweis', content: 'Die Grundformel U = R × I ist fundamental' },
+                        { id: 'quiz1', time: 180, type: 'quiz', title: 'Quiz: Ohmsche Gesetz', content: 'q1' },
+                        { id: 'bookmark1', time: 240, type: 'bookmark', title: 'Formeln Übersicht', content: 'Alle wichtigen Formeln zusammengefasst' },
+                        { id: 'quiz2', time: 360, type: 'quiz', title: 'Quiz: Widerstand', content: 'q2' }
+                      ]}
+                      transcript={[
+                        { time: 0, text: 'Willkommen zur Lektion über Elektrotechnik. Heute lernen wir die Grundlagen...', speaker: 'Prof. Schmidt' },
+                        { time: 30, text: 'Beginnen wir mit der Definition von elektrischem Strom...', speaker: 'Prof. Schmidt' },
+                        { time: 60, text: 'Das Ohmsche Gesetz ist eine der wichtigsten Beziehungen in der Elektrotechnik...', speaker: 'Prof. Schmidt' },
+                        { time: 120, text: 'Die Formel U = R × I beschreibt den Zusammenhang zwischen Spannung, Widerstand und Strom...', speaker: 'Prof. Schmidt' },
+                        { time: 180, text: 'Lassen Sie uns nun einige praktische Beispiele betrachten...', speaker: 'Prof. Schmidt' }
+                      ]}
                       onProgress={(progress) => {
                         // Update lesson progress
                         console.log('Video progress:', progress);
@@ -362,6 +384,12 @@ export default function CourseViewer({ courseId, user, onBack }: CourseViewerPro
                       onComplete={() => {
                         // Mark lesson as completed
                         console.log('Video completed');
+                      }}
+                      onAnnotationAdd={(annotation) => {
+                        console.log('New annotation:', annotation);
+                      }}
+                      onQuizAnswer={(questionId, answer, correct) => {
+                        console.log('Quiz answered:', { questionId, answer, correct });
                       }}
                     />
                     {currentLesson.content.textContent && (
@@ -486,13 +514,31 @@ export default function CourseViewer({ courseId, user, onBack }: CourseViewerPro
                 )}
 
                 {currentLesson.type === 'simulation' && (
-                  <div className="text-center py-12">
-                    <Settings className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">Interaktive Simulation</h3>
-                    <p className="text-muted-foreground mb-6">
-                      Hier würde eine interaktive Simulation zur Schaltungsberechnung erscheinen.
-                    </p>
-                    <Button>Simulation starten</Button>
+                  <div className="w-full">
+                    <div className="mb-6">
+                      <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                        <CircuitBoard className="h-6 w-6 text-primary" />
+                        Interaktive 3D-Schaltungssimulation
+                      </h3>
+                      <p className="text-muted-foreground">
+                        Experimentieren Sie mit elektrischen Schaltungen und verstehen Sie die Zusammenhänge zwischen Spannung, Strom und Widerstand.
+                      </p>
+                    </div>
+                    
+                    <Circuit3DSimulator 
+                      lessonId={currentLesson.id}
+                      circuitType={currentLesson.id.includes('parallel') ? 'parallel' : 'series'}
+                    />
+                    
+                    <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">💡 Lernziele dieser Simulation:</h4>
+                      <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                        <li>• Verstehen Sie das Ohm'sche Gesetz in der Praxis</li>
+                        <li>• Beobachten Sie Stromfluss in verschiedenen Schaltungsarten</li>
+                        <li>• Experimentieren Sie mit Komponenten-Werten</li>
+                        <li>• Analysieren Sie Spannungs- und Stromverteilung</li>
+                      </ul>
+                    </div>
                   </div>
                 )}
               </div>

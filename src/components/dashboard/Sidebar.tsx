@@ -14,7 +14,9 @@ import {
   Settings,
   MessageSquare,
   Share2,
-  Video
+  Video,
+  Bot,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +32,9 @@ export default function Sidebar({ user, currentView, setCurrentView, onLogout }:
     { id: "home" as DashboardView, label: "Dashboard", icon: Home },
     { id: "learning" as DashboardView, label: "Lernpfade", icon: BookOpen },
     { id: "progress" as DashboardView, label: "Fortschritt", icon: Trophy },
+    { id: "achievements" as DashboardView, label: "Erfolge", icon: Trophy },
+    { id: "adaptive" as DashboardView, label: "KI-Lernen", icon: Bot },
+    { id: "mentoring" as DashboardView, label: "Mentoring", icon: Users },
     { id: "social" as DashboardView, label: "Social Hub", icon: Share2 },
     { id: "messages" as DashboardView, label: "Nachrichten", icon: MessageSquare },
     { id: "rooms" as DashboardView, label: "Lernräume", icon: Video },
@@ -89,8 +94,34 @@ export default function Sidebar({ user, currentView, setCurrentView, onLogout }:
           })}
         </div>
 
+        {/* KI-Assistent Widget */}
+        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+              <Bot className="h-3 w-3 text-white" />
+            </div>
+            <h3 className="font-medium text-sm">KI-Assistent</h3>
+            <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-200">
+              <Sparkles className="h-2 w-2 mr-1" />
+              3 neue
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Ihr persönlicher Lernpartner ist bereit zu helfen!
+          </p>
+          <div className="text-xs space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-green-600 font-medium">Online & verfügbar</span>
+            </div>
+            <div className="text-muted-foreground">
+              💡 Neue Empfehlungen verfügbar
+            </div>
+          </div>
+        </div>
+
         {/* Stats */}
-        <div className="mt-8 p-4 bg-muted/50 rounded-lg">
+        <div className="mt-6 p-4 bg-muted/50 rounded-lg">
           <h3 className="font-medium mb-3 flex items-center gap-2">
             <Trophy className="h-4 w-4 text-yellow-500" />
             Fortschritt
@@ -103,6 +134,10 @@ export default function Sidebar({ user, currentView, setCurrentView, onLogout }:
             <div className="flex justify-between">
               <span>Erfolge</span>
               <span className="font-medium">{user.unlockedAchievements.length}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>KI-Erfolgsrate</span>
+              <span className="font-medium text-green-600">94%</span>
             </div>
             <div className="flex justify-between">
               <span>Status</span>

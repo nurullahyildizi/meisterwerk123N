@@ -39,7 +39,7 @@ const WhiteboardUI = ({ isInstructor, participants, isFullscreen, onToggleFullsc
     if (!editor) return;
     console.log('Exporting whiteboard as SVG...');
     try {
-        const shapes = editor.currentPageShapes;
+        const shapes = editor.getCurrentPageShapes();
         if (!shapes || shapes.length === 0) {
             console.log("No shapes to export.");
             return;
@@ -61,7 +61,7 @@ const WhiteboardUI = ({ isInstructor, participants, isFullscreen, onToggleFullsc
   const handleClearBoard = () => {
     if (!editor) return;
     console.log('Clearing whiteboard...');
-    const shapes = editor.currentPageShapes;
+    const shapes = editor.getCurrentPageShapes();
     if (shapes && shapes.length > 0) {
         const shapeIds = shapes.map(shape => shape.id);
         editor.deleteShapes(shapeIds);
